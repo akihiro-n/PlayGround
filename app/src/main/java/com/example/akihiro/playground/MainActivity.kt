@@ -15,23 +15,6 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         binding = DataBindingUtil.setContentView(this, R.layout.activity_main)
-        binding.ediText
-            .toStringObservable(TextChanged.Before::class.java)
-            .subscribe {
-                Log.v("ああ",it )
-        }
-        binding.ediText.beforeTextChangedListener { s, start, count, after ->
-            Log.v("ああ1","${s}, ${start}, ${count}, ${after}" )
-        }
 
-        binding.ediText
-            .toStringObservable(TextChanged.On::class.java)
-            .subscribe {
-                Log.v("ああ2",it )
-            }
-
-        binding.ediText.onTextChangedListener { s, start, before, count ->
-            Log.v("ああ3","${s}, ${start}, ${count}, ${before}" )
-        }
     }
 }

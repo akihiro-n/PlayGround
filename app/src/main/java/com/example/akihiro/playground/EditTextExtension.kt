@@ -46,7 +46,7 @@ sealed class TextChanged : TextChangedType {
  *  }
  */
 inline fun <reified T> EditText.toStringObservable(clazz: Class<T>): Observable<String> where T : TextChangedType {
-    return toObservable(clazz).map { it.s }
+    return this@toStringObservable.toObservable(clazz).map { it.s }
 }
 
 /**
@@ -65,73 +65,52 @@ inline fun <reified T> EditText.toStringObservable(clazz: Class<T>): Observable<
  */
 inline fun <reified T> EditText.toObservable(clazz: Class<T>): Observable<T> where T : TextChangedType {
     return Observable.create { emitter ->
-        when (clazz) {
-            TextChanged.After::class.java ->
-                this@toObservable.afterTextChangedListener {
-                    emitter.onNext(TextChanged.After(it) as T)
-                }
-            TextChanged.Before::class.java ->
-                this@toObservable.beforeTextChangedListener { s, start, count, after ->
-                    emitter.onNext(TextChanged.Before(s, start, count, after) as T)
-                }
-            TextChanged.On::class.java ->
-                this@toObservable.onTextChangedListener { s, start, before, count ->
-                    emitter.onNext(TextChanged.On(s, start, before, count) as T)
-                }
+        emitter.apply {
+            when (clazz) {
+                TextChanged.After::class.java ->
+                    this@toObservable.textChangedListener(TextChanged.After::class.java) {
+                        onNext(it as T)
+                    }
+                TextChanged.Before::class.java ->
+                    this@toObservable.textChangedListener(TextChanged.Before::class.java) {
+                        onNext(it as T)
+                    }
+                TextChanged.On::class.java ->
+                    this@toObservable.textChangedListener(TextChanged.On::class.java) {
+                        onNext(it as T)
+                    }
+            }
         }
     }
 }
 
 /**
  * EditTextクラスの拡張
- * TextWatcherのafterTextChangedListenerの値だけをcallBackに流す
+ * TextWatcherのコールバックメソッドで受け取った引数の値をcallBackに渡す
+ * 使用するコールバックメソッドは引数の型で分岐させる
+ * @param clazz [TextChangedType]
  * @param callBack
+ * @return
  */
-fun EditText.afterTextChangedListener(callBack: (String) -> Unit) {
-    this@afterTextChangedListener.addTextChangedListener(object : TextWatcher {
-        override fun afterTextChanged(editable: Editable?) {
-            editable?.let {
-                callBack.invoke("$it")
+inline fun <reified T> EditText.textChangedListener(clazz: Class<T>, crossinline callBack: (T) -> Unit) where T : TextChangedType {
+    this@textChangedListener.addTextChangedListener(object : TextWatcher {
+        override fun afterTextChanged(s: Editable?) {
+            s?.let {
+                if(clazz == TextChanged.After::class.java)
+                    callBack.invoke(TextChanged.After("$it") as T)
             }
         }
-
-        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-    })
-}
-
-/**
- * EditTextクラスの拡張
- * TextWatcherのbeforeTextChangedの値だけをcallBackに流す
- * @param callBack
- */
-fun EditText.beforeTextChangedListener(callBack: (s: String, start: Int, count: Int, after: Int) -> Unit) {
-    this@beforeTextChangedListener.addTextChangedListener(object : TextWatcher {
         override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
             s?.let {
-                callBack.invoke("$it", start, count, after)
+                if(clazz == TextChanged.Before::class.java)
+                    callBack.invoke(TextChanged.Before("$it", start, count, after) as T)
             }
         }
-
-        override fun afterTextChanged(editable: Editable?) {}
-        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-    })
-}
-
-/**
- * EditTextクラスの拡張
- * TextWatcherのonTextChangedの値だけをcallBackに流す
- * @param callBack
- */
-fun EditText.onTextChangedListener(callBack: (s: String, start: Int, before: Int, count: Int) -> Unit) {
-    this@onTextChangedListener.addTextChangedListener(object : TextWatcher {
         override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
             s?.let {
-                callBack.invoke("$it", start, before, count)
+                if(clazz == TextChanged.On::class.java)
+                    callBack.invoke(TextChanged.On("$it", start, before, count) as T)
             }
         }
-
-        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-        override fun afterTextChanged(editable: Editable?) {}
     })
 }
