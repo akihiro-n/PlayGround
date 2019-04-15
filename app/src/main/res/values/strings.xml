@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">PlayGround</string>
+    <string name="base_url"></string>
 </resources>
