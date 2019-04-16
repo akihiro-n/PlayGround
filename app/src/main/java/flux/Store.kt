@@ -9,7 +9,7 @@ abstract class Store : KoinComponent {
 
     private val dispatcher by inject<Dispatcher>()
 
-    protected val observable: Observable<Action> = dispatcher.observeOn(AndroidSchedulers.mainThread())
+    protected val onDispatch: Observable<Action> = dispatcher.observeOn(AndroidSchedulers.mainThread())
 
     /**
      * 空のエラー

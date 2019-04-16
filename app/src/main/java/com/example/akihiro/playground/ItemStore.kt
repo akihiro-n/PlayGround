@@ -9,8 +9,8 @@ import io.reactivex.subjects.BehaviorSubject
 class ItemStore : Store() {
 
     private var nextPage = 1
-    private val itemsSubject = BehaviorSubject.create<List<Item>>()
-    private val fetchItemErrorSubject = BehaviorSubject.create<Throwable>()
+    private val itemsSubject = BehaviorSubject.createDefault<List<Item>>(listOf())
+    private val fetchItemErrorSubject = BehaviorSubject.createDefault<Throwable>(EmptyError())
 
     val nextPageState: Int
         get() = nextPage
@@ -19,14 +19,32 @@ class ItemStore : Store() {
     val errorFetchItemsState: Observable<Throwable>
         get() = fetchItemErrorSubject
 
+    private val newItemsObservable: Observable<List<Item>> = onDispatch
+        .updateNextPageState()
+        .ofType(ItemAction.FetchNewItems::class.java)
+        .map(ItemAction.FetchNewItems::item)
+
+    private val itemsForQueryObservable: Observable<List<Item>> = onDispatch
+        .updateNextPageState()
+        .ofType(ItemAction.FetchItemsForQuery::class.java)
+        .map(ItemAction.FetchItemsForQuery::item)
+
+    private val errorFetchNewItemsObservable: Observable<Throwable> = onDispatch
+        .ofType(ItemAction.ErrorFetchNewItems::class.java)
+        .map(ItemAction.ErrorFetchNewItems::throwable)
+
+
+    private val errorFetchItemsForQueryObservable: Observable<Throwable> = onDispatch
+        .ofType(ItemAction.ErrorFetchItemsForQuery::class.java)
+        .map(ItemAction.ErrorFetchItemsForQuery::throwable)
+
     init {
         initActionObservables()
     }
 
     @SuppressLint("CheckResult")
     private fun initActionObservables() {
-        observable
-            .updateNextPageState()
+        onDispatch
             .ofType(ItemAction.Initialize::class.java)
             .subscribe {
                 nextPage = 1
@@ -34,41 +52,22 @@ class ItemStore : Store() {
                 fetchItemErrorSubject.onNext(EmptyError()) //TODO onNextのタイミングでnullを流せる仕様にしたい
             }
 
-        observable
-            .updateNextPageState()
-            .ofType(ItemAction.FetchNewItems::class.java)
-            .map(ItemAction.FetchNewItems::item)
+        Observable
+            .merge(newItemsObservable, itemsForQueryObservable)
             .subscribe { items ->
                 itemsSubject.apply {
-                    value.let { value ->
-                        if (value == null) onNext(items)
+                    value?.let { value ->
+                        if (value.isEmpty()) onNext(items)
                         else onNext(value.plus(items))
                     }
                 }
             }
 
-        observable
-            .updateNextPageState()
-            .ofType(ItemAction.FetchItemsForQuery::class.java)
-            .map(ItemAction.FetchItemsForQuery::item)
-            .subscribe{ items ->
-                itemsSubject.apply {
-                    value.let { value ->
-                        if (value == null) onNext(items)
-                        else onNext(value.plus(items))
-                    }
-                }
+        Observable
+            .merge(errorFetchNewItemsObservable, errorFetchItemsForQueryObservable)
+            .subscribe { throwable ->
+                fetchItemErrorSubject.onNext(throwable)
             }
-
-        observable
-            .ofType(ItemAction.ErrorFetchNewItems::class.java)
-            .map(ItemAction.ErrorFetchNewItems::throwable)
-            .subscribe(fetchItemErrorSubject::onNext)
-
-        observable
-            .ofType(ItemAction.ErrorFetchItemsForQuery::class.java)
-            .map(ItemAction.ErrorFetchItemsForQuery::throwable)
-            .subscribe(fetchItemErrorSubject::onNext)
     }
 
     private fun Observable<Action>.updateNextPageState() = doOnNext { nextPage += 1 }
